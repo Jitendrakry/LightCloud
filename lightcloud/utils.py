@@ -7,7 +7,28 @@ from StringIO import StringIO
 import memcache
 import pytyrant
 
+import threading
 
+
+#--- Connection manager ----------------------------------------------
+connections = threading.local()
+
+def get_connection(host, port):
+    key = '%s:%s' % (host, port)
+    cur_connection = hasattr(connections, key)
+
+    if not cur_connection:
+        setattr(connections, key, pytyrant.Tyrant.open(host, port))
+    return getattr(connections, key)
+
+def close_open_connections():
+    for key in dir(connections):
+        if '__' not in key:
+            getattr(connections, key).close()
+            delattr(connections, key)
+
+
+#--- pytyrant client ----------------------------------------------
 class TyrantClient:
 
     def __init__(self, servers):
@@ -17,10 +38,7 @@ class TyrantClient:
     #--- Incr and decr ----------------------------------------------
     def incr(self, key, delta=1):
         db = self.get_db(key)
-        try:
-            return db.call_func('incr', key, "%s" % delta, record_locking=True)
-        finally:
-            db.close()
+        return db.call_func('incr', key, "%s" % delta, record_locking=True)
 
     #--- Set, get and delete ----------------------------------------------
     def set(self, key, val, **kw):
@@ -32,19 +50,13 @@ class TyrantClient:
         except:
             return False
 
-        finally:
-            db.close()
-
     def get(self, key, **kw):
         db = self.get_db(key)
         try:
-            try:
-                val = db.get(key)
-            except:
-                return None
-            return val
-        finally:
-            db.close()
+            val = db.get(key)
+        except:
+            return None
+        return val
 
     def delete(self, key):
         db = self.get_db(key)
@@ -55,9 +67,6 @@ class TyrantClient:
         except:
             return False
 
-        finally:
-            db.close()
-
     #--- List ----------------------------------------------
     def _encode_list(self, values):
         v_encoded = []
@@ -67,17 +76,11 @@ class TyrantClient:
 
     def list_add(self, key, values):
         db = self.get_db(key)
-        try:
-            return db.call_func('list_add', key, self._encode_list(values), record_locking=True)
-        finally:
-            db.close()
+        return db.call_func('list_add', key, self._encode_list(values), record_locking=True)
 
     def list_remove(self, key, values):
         db = self.get_db(key)
-        try:
-            return db.call_func('list_remove', key, self._encode_list(values), record_locking=True)
-        finally:
-            db.close()
+        return db.call_func('list_remove', key, self._encode_list(values), record_locking=True)
 
     def get_db(self, key):
         servers = list(self.servers)
@@ -85,15 +88,16 @@ class TyrantClient:
         #Load balance by key
         index = hash(key) % len(servers)
         first_host, first_port = servers.pop(index)
+
         try:
-            return pytyrant.Tyrant.open(first_host, first_port)
+            return get_connection(first_host, first_port)
         except:
             pass
 
         #This did not work out, try the other servers
         for host, port in servers:
             try:
-                return pytyrant.Tyrant.open(host, port)
+                return get_connection(host, port)
             except Exception, e:
                 if e[0] == 61:
                     continue
@@ -101,6 +105,7 @@ class TyrantClient:
         raise
 
 
+#--- Memcached client ----------------------------------------------
 class MemcacheClient(memcache.Client):
     """Memcache client to talk to Tyrant.
     """

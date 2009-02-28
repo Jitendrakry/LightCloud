@@ -1,5 +1,6 @@
 from hash_ring import HashRing
-from utils import MemcacheClient, TyrantClient
+from utils import MemcacheClient, TyrantClient,\
+                  close_open_connections, get_connection
 from threading import local
 
 local_cache = local()
