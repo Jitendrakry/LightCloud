@@ -1,11 +1,16 @@
-from hash_ring import HashRing
-from utils import MemcacheClient, TyrantClient,\
-                  close_open_connections, get_connection
 from threading import local
 
-local_cache = local()
+from hash_ring import HashRing
 
-#--- Global and init ----------------------------------------------
+try:
+    from memcache_client import MemcacheClient
+except ImportError, e:
+    MemcacheClient = None
+
+from tyrant_client import TyrantClient, close_open_connections, get_connection
+
+
+#--- Global ----------------------------------------------
 storage_ring = None
 lookup_ring = None
 default_node = None
@@ -16,6 +21,10 @@ name_to_l_node = {}
 _lookup_nodes = None
 _storage_nodes = None
 
+local_cache = local()
+
+
+#--- Init and config ----------------------------------------------
 def init(lookup_nodes, storage_nodes):
     global _lookup_nodes, _storage_nodes
     _lookup_nodes = lookup_nodes
@@ -136,6 +145,7 @@ def get(key):
 
     return result
 
+
 def delete(key):
     """Lookup's the storage node in the lookup ring
     and deletes the key from lookup ring and storage node
@@ -206,6 +216,7 @@ def locate_node(key):
     else:
         return _clean_up_ring(key, value)
 
+
 def _clean_up_ring(key, value):
     """If the number of hops is greater than 0,
     then we clean up the ring by setting the right value,
@@ -222,16 +233,17 @@ def _clean_up_ring(key, value):
     return get_storage_node(value)
 
 
-#--- Helpers ----------------------------------------------
-class MemcachedNode(MemcacheClient):
-    """Extends the memcached client with a proper __str__ method"""
+#--- Node types ----------------------------------------------
+if MemcacheClient:
+    class MemcachedNode(MemcacheClient):
+        """Extends the memcached client with a proper __str__ method"""
 
-    def __init__(self, name, nodes, *k, **kw):
-        self.name = name
-        MemcacheClient.__init__(self, nodes, *k, **kw)
+        def __init__(self, name, nodes, *k, **kw):
+            self.name = name
+            MemcacheClient.__init__(self, nodes, *k, **kw)
 
-    def __str__(self):
-        return self.name
+        def __str__(self):
+            return self.name
 
 class TyrantNode(TyrantClient):
     """Extends the tyrant client with a proper __str__ method"""
@@ -243,6 +255,8 @@ class TyrantNode(TyrantClient):
     def __str__(self):
         return self.name
 
+
+#--- Helpers ----------------------------------------------
 def generate_ring(nodes, name_to_obj):
     """Given a set of nodes it created nodes's
     and returns a hash ring with them"""

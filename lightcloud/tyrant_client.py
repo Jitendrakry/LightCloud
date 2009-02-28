@@ -1,13 +1,6 @@
-import base64
-import zlib
-import pickle
-import random
-from StringIO import StringIO
-
-import memcache
-import pytyrant
-
 import threading
+
+import pytyrant
 
 
 #--- Connection manager ----------------------------------------------
@@ -105,31 +98,3 @@ class TyrantClient:
         raise
 
 
-#--- Memcached client ----------------------------------------------
-class MemcacheClient(memcache.Client):
-    """Memcache client to talk to Tyrant.
-    """
-    def __init__(self, *k, **kw):
-        memcache.Client.__init__(self, *k, **kw)
-
-    def get(self, key, **kw):
-        key = base64.b64encode(key)
-        val = memcache.Client.get(self, key, **kw)
-        return val
-
-    def delete(self, key):
-        key = base64.b64encode(key)
-        return memcache.Client.delete(self, key)
-
-    def incr(self, key, delta=1):
-        key = base64.b64encode(key)
-        return memcache.Client.incr(self, key, delta=delta)
-
-    def decr(self, key, delta=1):
-        key = base64.b64encode(key)
-        return memcache.Client.decr(self, key, delta=delta)
-
-    def set(self, key, val, **kw):
-        key = base64.b64encode(key)
-        result = memcache.Client.set(self, key, val, **kw)
-        return result
