@@ -25,6 +25,18 @@ def init(lookup_nodes, storage_nodes):
     lookup_ring = generate_ring(lookup_nodes, name_to_l_node)
     storage_ring = generate_ring(storage_nodes, name_to_s_node)
 
+def generate_nodes(lc_config):
+    lookup_nodes = {}
+    storage_nodes = {}
+
+    for k, v in lc_config.items():
+        if 'lookup' in k:
+            lookup_nodes[k] = v
+        elif 'storage' in k:
+            storage_nodes[k] = v
+
+    return lookup_nodes, storage_nodes
+
 
 #--- Node accessors ----------------------------------------------
 def storage_nodes():
