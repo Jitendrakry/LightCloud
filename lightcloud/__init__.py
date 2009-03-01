@@ -3,11 +3,11 @@ from threading import local
 from hash_ring import HashRing
 
 try:
-    from memcache_client import MemcacheClient
+    from memcache_client import MemcachedNode
 except ImportError, e:
-    MemcacheClient = None
+    pass
 
-from tyrant_client import TyrantClient, close_open_connections, get_connection
+from tyrant_client import TyrantNode, close_open_connections, get_connection
 
 
 #--- Global ----------------------------------------------
@@ -231,29 +231,6 @@ def _clean_up_ring(key, value):
         else:
             node.delete(key)
     return get_storage_node(value)
-
-
-#--- Node types ----------------------------------------------
-if MemcacheClient:
-    class MemcachedNode(MemcacheClient):
-        """Extends the memcached client with a proper __str__ method"""
-
-        def __init__(self, name, nodes, *k, **kw):
-            self.name = name
-            MemcacheClient.__init__(self, nodes, *k, **kw)
-
-        def __str__(self):
-            return self.name
-
-class TyrantNode(TyrantClient):
-    """Extends the tyrant client with a proper __str__ method"""
-
-    def __init__(self, name, nodes, *k, **kw):
-        self.name = name
-        TyrantClient.__init__(self, nodes, *k, **kw)
-
-    def __str__(self):
-        return self.name
 
 
 #--- Helpers ----------------------------------------------

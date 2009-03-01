@@ -23,3 +23,13 @@ class MemcacheClient(memcache.Client):
     def set(self, key, val, **kw):
         result = memcache.Client.set(self, key, val, **kw)
         return result
+
+class MemcachedNode(MemcacheClient):
+    """Extends the memcached client with a proper __str__ method"""
+
+    def __init__(self, name, nodes, *k, **kw):
+        self.name = name
+        MemcacheClient.__init__(self, nodes, *k, **kw)
+
+    def __str__(self):
+        return self.name
