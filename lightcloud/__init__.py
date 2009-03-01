@@ -13,9 +13,6 @@ from tyrant_client import TyrantNode, close_open_connections, get_connection
 #--- Global ----------------------------------------------
 default_node = None
 
-name_to_s_node = {}
-name_to_l_node = {}
-
 local_cache = local()
 
 systems = {}
@@ -23,9 +20,14 @@ systems = {}
 
 #--- Init and config ----------------------------------------------
 def init(lookup_nodes, storage_nodes, system='default'):
+    name_to_s_node = {}
+    name_to_l_node = {}
+
     lookup_ring = generate_ring(lookup_nodes, name_to_l_node)
     storage_ring = generate_ring(storage_nodes, name_to_s_node)
-    systems[system] = (lookup_ring, storage_ring)
+
+    systems[system] = (lookup_ring, storage_ring,
+                       name_to_l_node, name_to_s_node)
 
 def generate_nodes(lc_config):
     lookup_nodes = {}
@@ -49,23 +51,23 @@ def get_storage_ring(system='default'):
 
 
 #--- Node accessors ----------------------------------------------
-def storage_nodes():
+def storage_nodes(system='default'):
     """Returns the storage nodes in the storage ring"""
-    for node in name_to_s_node.values():
+    for node in systems[system][3].values():
         yield node
 
-def lookup_nodes():
+def lookup_nodes(system='default'):
     """Returns the lookup nodes in the lookup ring"""
-    for node in name_to_l_node.values():
+    for node in systems[system][2].values():
         yield node
 
-def get_storage_node(name):
+def get_storage_node(name, system='default'):
     """Returns a storage node by its name"""
-    return name_to_s_node.get(name)
+    return systems[system][3].get(name)
 
-def get_lookup_node(name):
+def get_lookup_node(name, system='default'):
     """Returns a lookup node by its name"""
-    return name_to_l_node.get(name)
+    return systems[system][2].get(name)
 
 
 #--- Operations ----------------------------------------------
@@ -75,15 +77,17 @@ def incr(key, delta=1, system='default'):
 
 
 #--- List ----------------------------------------------
-def list_init(key):
+def list_init(key, system='default'):
     key = 'll_%s' % key
-    set(key, '')
+    set(key, '', system)
 
-def list_get(key):
+def list_get(key, system='default'):
     key = 'll_%s' % key
-    value = get(key)
+    value = get(key, system)
+
     if value:
         return [ v for v in value.split(r'~') if v ]
+
     return []
 
 def list_add(key, values, system='default'):
@@ -92,8 +96,9 @@ def list_add(key, values, system='default'):
     storage_node = locate_node_or_init(key, system)
     result = storage_node.list_add(key, values)
 
-    if hasattr(local_cache, str(hash(key))):
-        delattr(local_cache, str(hash(key)))
+    if hasattr(local_cache, '%s%s' % (system, hash(key))):
+        delattr(local_cache, '%s%s' % (system, hash(key)))
+
     return result
 
 def list_remove(key, values, system='default'):
@@ -102,17 +107,19 @@ def list_remove(key, values, system='default'):
     storage_node = locate_node_or_init(key, system)
     result = storage_node.list_remove(key, values)
 
-    if hasattr(local_cache, str(hash(key))):
-        delattr(local_cache, str(hash(key)))
+    if hasattr(local_cache, '%s%s' % (system, hash(key))):
+        delattr(local_cache, '%s%s' % (system, hash(key)))
 
     return result
 
-def list_varnish(key):
+def list_varnish(key, system='default'):
     key = 'll_%s' % key
 
-    result = delete(key)
-    if hasattr(local_cache, str(hash(key))):
-        delattr(local_cache, str(hash(key)))
+    result = delete(key, system)
+
+    if hasattr(local_cache, '%s%s' % (system, hash(key))):
+        delattr(local_cache, '%s%s' % (system, hash(key)))
+
     return result
 
 
@@ -121,14 +128,15 @@ def get(key, system='default'):
     """Lookup's the storage node in the
     lookup ring and return's the stored value
     """
-    if hasattr(local_cache, str(hash(key))):
-        return getattr(local_cache, str(hash(key)))
+    if hasattr(local_cache, '%s%s' % (system, hash(key))):
+        return getattr(local_cache, '%s%s' % (system, hash(key)))
 
     #Try to look it up directly
     result = None
 
     storage_node = get_storage_ring(system).get_node(key)
     value = storage_node.get(key)
+
     if value != None:
         result = value
 
@@ -139,7 +147,7 @@ def get(key, system='default'):
         if storage_node:
             result = storage_node.get(key)
 
-    setattr(local_cache, str(hash(key)), result)
+    setattr(local_cache, '%s%s' % (system, hash(key)), result)
 
     if len(dir(local_cache)) > 750:
         clean_local_cache()
@@ -163,8 +171,8 @@ def delete(key, system='default'):
     if storage_node:
         storage_node.delete(key)
 
-    if hasattr(local_cache, str(hash(key))):
-        delattr(local_cache, str(hash(key)))
+    if hasattr(local_cache, '%s%s' % (system, hash(key))):
+        delattr(local_cache, '%s%s' % (system, hash(key)))
 
     return True
 
@@ -177,8 +185,8 @@ def set(key, value, system='default'):
     """
     storage_node = locate_node_or_init(key, system)
 
-    if hasattr(local_cache, str(hash(key))):
-        delattr(local_cache, str(hash(key)))
+    if hasattr(local_cache, '%s%s' % (system, hash(key))):
+        delattr(local_cache, '%s%s' % (system, hash(key)))
 
     return storage_node.set(key, value)
 
@@ -213,7 +221,7 @@ def locate_node(key, system='default'):
         return None
 
     if lookups == 0:
-        return get_storage_node(value)
+        return get_storage_node(value, system)
     else:
         return _clean_up_ring(key, value, system)
 
@@ -233,7 +241,7 @@ def _clean_up_ring(key, value, system):
         else:
             node.delete(key)
 
-    return get_storage_node(value)
+    return get_storage_node(value, system)
 
 
 #--- Helpers ----------------------------------------------
@@ -256,9 +264,9 @@ def generate_ring(nodes, name_to_obj):
 
 def regenerate_ring(system='default'):
     try:
-        for node in lookup_nodes():
+        for node in lookup_nodes(system):
             node.disconnect_all()
-        for node in storage_nodes():
+        for node in storage_nodes(system):
             node.disconnect_all()
     except Exception, e:
         pass
