@@ -73,6 +73,10 @@ def get_lookup_node(name, system='default'):
 #--- Operations ----------------------------------------------
 def incr(key, delta=1, system='default'):
     storage_node = locate_node_or_init(key, system)
+
+    if hasattr(local_cache, '%s%s' % (system, hash(key))):
+        delattr(local_cache, '%s%s' % (system, hash(key)))
+
     return storage_node.incr(key, delta)
 
 
