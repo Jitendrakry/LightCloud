@@ -24,6 +24,14 @@ class MemcacheClient(memcache.Client):
         result = memcache.Client.set(self, key, val, **kw)
         return result
 
+    #--- List fn ----------------------------------------------
+    def list_add(self, key, values):
+        pass
+
+    def list_remove(self, key, values):
+        pass
+
+
 class MemcachedNode(MemcacheClient):
     """Extends the memcached client with a proper __str__ method"""
 
