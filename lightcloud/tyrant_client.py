@@ -11,7 +11,10 @@ def get_connection(host, port):
     cur_connection = hasattr(connections, key)
 
     if not cur_connection:
-        setattr(connections, key, pytyrant.Tyrant.open(host, port))
+        client = pytyrant.Tyrant.open(host, port)
+        client.cache_key = key
+        setattr(connections, key, client)
+
     return getattr(connections, key)
 
 def close_open_connections():
@@ -30,32 +33,30 @@ class TyrantClient:
 
     #--- Incr and decr ----------------------------------------------
     def incr(self, key, delta=1):
-        db = self.get_db(key)
-        return db.call_func('incr', key, "%s" % delta, record_locking=True)
+        return self.call_db(key, 'call_func',
+                            'incr', key, "%s" % delta, record_locking=True)
 
     #--- Set, get and delete ----------------------------------------------
     def set(self, key, val, **kw):
-        db = self.get_db(key)
-
         try:
-            db.put(key, val)
+            self.call_db(key, 'put',
+                         key, val)
             return True
         except:
+            raise
             return False
 
     def get(self, key, **kw):
-        db = self.get_db(key)
         try:
-            val = db.get(key)
-        except:
+            val = self.call_db(key, 'get', key)
+        except Exception, e:
+            print e
             return None
         return val
 
     def delete(self, key):
-        db = self.get_db(key)
-
         try:
-            db.out(key)
+            self.call_db(key, 'out', key)
             return True
         except:
             return False
@@ -68,12 +69,37 @@ class TyrantClient:
         return ''.join(v_encoded)
 
     def list_add(self, key, values):
-        db = self.get_db(key)
-        return db.call_func('list_add', key, self._encode_list(values), record_locking=True)
+        return self.call_db(key, 'call_func',
+                            'list_add', key,
+                            self._encode_list(values), record_locking=True)
 
     def list_remove(self, key, values):
+        return self.call_db(key, 'call_func',
+                            'list_remove', key,
+                            self._encode_list(values), record_locking=True)
+
+    #--- db man ----------------------------------------------
+    def call_db(self, key, operation, *k, **kw):
         db = self.get_db(key)
-        return db.call_func('list_remove', key, self._encode_list(values), record_locking=True)
+
+        tries = 0
+        if 'tries' in kw:
+            tries = kw.pop('tries') + 1
+
+        if tries > 4:
+            raise
+
+        try:
+            return getattr(db, operation)(*k, **kw)
+        except Exception, e:
+            if e[0] in (32, 54): #Broken pipe, on master switch
+                kw['tries'] = tries
+
+                if hasattr(connections, db.cache_key):
+                    delattr(connections, db.cache_key)
+
+                return self.call_db(key, operation, *k, **kw)
+            raise
 
     def get_db(self, key):
         servers = list(self.servers)

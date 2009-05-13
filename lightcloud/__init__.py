@@ -126,6 +126,13 @@ def list_varnish(key, system='default'):
 
     return result
 
+def list_is_created(key, system='default'):
+    key = 'll_%s' % key
+    value = get(key, system)
+    if value:
+        return True
+    return False
+
 
 #--- Get, set and delete ----------------------------------------------
 def get(key, system='default'):
