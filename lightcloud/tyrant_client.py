@@ -43,14 +43,12 @@ class TyrantClient:
                          key, val)
             return True
         except:
-            raise
             return False
 
     def get(self, key, **kw):
         try:
             val = self.call_db(key, 'get', key)
         except Exception, e:
-            print e
             return None
         return val
 
@@ -92,7 +90,7 @@ class TyrantClient:
         try:
             return getattr(db, operation)(*k, **kw)
         except Exception, e:
-            if e[0] in (32, 54): #Broken pipe, on master switch
+            if e[0] in (1, 32, 54): #Broken pipe, on master switch
                 kw['tries'] = tries
 
                 if hasattr(connections, db.cache_key):
