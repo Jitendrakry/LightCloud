@@ -87,6 +87,7 @@ class TyrantClient:
 
         servers = list(self.servers)
 
+        exp = Exception("unknown")
         while len(servers) > 0:
             host, port = pick_server(key, servers)
 
@@ -94,9 +95,10 @@ class TyrantClient:
                 db = get_connection(host, port)
                 return getattr(db, operation)(*k, **kw)
             except Exception, e:
+                exp = e
                 continue
 
-        raise
+        raise exp
 
 class TyrantNode(TyrantClient):
     """Extends the tyrant client with a proper __str__ method"""
