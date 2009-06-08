@@ -78,49 +78,25 @@ class TyrantClient:
 
     #--- db man ----------------------------------------------
     def call_db(self, key, operation, *k, **kw):
-        db = self.get_db(key)
+        key_hash = hash(key)
 
-        tries = 0
-        if 'tries' in kw:
-            tries = kw.pop('tries') + 1
+        def pick_server(skey, servers):
+            index = key_hash % len(servers)
+            host, port = servers.pop(index)
+            return host, port
 
-        if tries > 4:
-            raise
-
-        try:
-            return getattr(db, operation)(*k, **kw)
-        except Exception, e:
-            if e[0] in (1, 32, 54): #Broken pipe, on master switch
-                kw['tries'] = tries
-
-                if hasattr(connections, db.cache_key):
-                    delattr(connections, db.cache_key)
-
-                return self.call_db(key, operation, *k, **kw)
-            raise
-
-    def get_db(self, key):
         servers = list(self.servers)
 
-        #Load balance by key
-        index = hash(key) % len(servers)
-        first_host, first_port = servers.pop(index)
+        while len(servers) > 0:
+            host, port = pick_server(key, servers)
 
-        try:
-            return get_connection(first_host, first_port)
-        except:
-            pass
-
-        #This did not work out, try the other servers
-        for host, port in servers:
             try:
-                return get_connection(host, port)
+                db = get_connection(host, port)
+                return getattr(db, operation)(*k, **kw)
             except Exception, e:
-                if e[0] == 61:
-                    continue
-                raise
-        raise
+                continue
 
+        raise
 
 class TyrantNode(TyrantClient):
     """Extends the tyrant client with a proper __str__ method"""
