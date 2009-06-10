@@ -33,8 +33,8 @@ class TyrantClient:
 
     #--- Incr and decr ----------------------------------------------
     def incr(self, key, delta=1):
-        return self.call_db(key, 'call_func',
-                            'incr', key, "%s" % delta, record_locking=True)
+        return self.call_db(key, 'ext',
+                            'incr', pytyrant.RDBXOLCKREC, key, "%s" % delta)
 
     #--- Set, get and delete ----------------------------------------------
     def set(self, key, val, **kw):
@@ -66,15 +66,21 @@ class TyrantClient:
             v_encoded.append('%s~' % v)
         return ''.join(v_encoded)
 
-    def list_add(self, key, values):
-        return self.call_db(key, 'call_func',
-                            'list_add', key,
-                            self._encode_list(values), record_locking=True)
+    def list_add(self, key, values, limit=200):
+        return self.call_db(key, 'ext',
+                            'list_add', pytyrant.RDBXOLCKREC,
+                            key, self._encode_list(values))
 
     def list_remove(self, key, values):
-        return self.call_db(key, 'call_func',
-                            'list_remove', key,
-                            self._encode_list(values), record_locking=True)
+        return self.call_db(key, 'ext',
+                            'list_remove', pytyrant.RDBXOLCKREC,
+                            key, self._encode_list(values))
+
+    def list_get(self, key):
+        value = self.get(key)
+        if value:
+            return [ v for v in value.split(r'~') if v ]
+        return []
 
     #--- db man ----------------------------------------------
     def call_db(self, key, operation, *k, **kw):
@@ -88,6 +94,7 @@ class TyrantClient:
         servers = list(self.servers)
 
         exp = Exception("unknown")
+
         while len(servers) > 0:
             host, port = pick_server(key, servers)
 

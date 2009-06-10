@@ -7,27 +7,27 @@ try:
 except ImportError, e:
     pass
 
-from tyrant_client import TyrantNode, close_open_connections, get_connection
+from tyrant_client import TyrantNode, close_open_connections as tryant_close, get_connection
+from redis_client import RedisNode, close_open_connections as redis_close, get_connection
 
 
 #--- Global ----------------------------------------------
-default_node = None
-
-local_cache = local()
+default_node = TyrantNode
 
 systems = {}
 
 
 #--- Init and config ----------------------------------------------
-def init(lookup_nodes, storage_nodes, system='default'):
+def init(lookup_nodes, storage_nodes, system='default', node_type=None):
     name_to_s_node = {}
     name_to_l_node = {}
 
-    lookup_ring = generate_ring(lookup_nodes, name_to_l_node)
-    storage_ring = generate_ring(storage_nodes, name_to_s_node)
+    lookup_ring = generate_ring(lookup_nodes, name_to_l_node, node_type)
+    storage_ring = generate_ring(storage_nodes, name_to_s_node, node_type)
 
     systems[system] = (lookup_ring, storage_ring,
                        name_to_l_node, name_to_s_node)
+
 
 def generate_nodes(lc_config):
     lookup_nodes = {}
@@ -73,10 +73,6 @@ def get_lookup_node(name, system='default'):
 #--- Operations ----------------------------------------------
 def incr(key, delta=1, system='default'):
     storage_node = locate_node_or_init(key, system)
-
-    if hasattr(local_cache, '%s%s' % (system, hash(key))):
-        delattr(local_cache, '%s%s' % (system, hash(key)))
-
     return storage_node.incr(key, delta)
 
 
@@ -85,45 +81,26 @@ def list_init(key, system='default'):
     key = 'll_%s' % key
     set(key, '', system)
 
-def list_get(key, system='default'):
+def list_get(key, system='default', **kw):
     key = 'll_%s' % key
-    value = get(key, system)
-
-    if value:
-        return [ v for v in value.split(r'~') if v ]
-
-    return []
-
-def list_add(key, values, system='default'):
-    key = 'll_%s' % key
-
     storage_node = locate_node_or_init(key, system)
-    result = storage_node.list_add(key, values)
+    return storage_node.list_get(key, **kw)
 
-    if hasattr(local_cache, '%s%s' % (system, hash(key))):
-        delattr(local_cache, '%s%s' % (system, hash(key)))
-
+def list_add(key, values, system='default', limit=200):
+    key = 'll_%s' % key
+    storage_node = locate_node_or_init(key, system)
+    result = storage_node.list_add(key, values, limit)
     return result
 
 def list_remove(key, values, system='default'):
     key = 'll_%s' % key
-
     storage_node = locate_node_or_init(key, system)
     result = storage_node.list_remove(key, values)
-
-    if hasattr(local_cache, '%s%s' % (system, hash(key))):
-        delattr(local_cache, '%s%s' % (system, hash(key)))
-
     return result
 
 def list_varnish(key, system='default'):
     key = 'll_%s' % key
-
     result = delete(key, system)
-
-    if hasattr(local_cache, '%s%s' % (system, hash(key))):
-        delattr(local_cache, '%s%s' % (system, hash(key)))
-
     return result
 
 def list_is_created(key, system='default'):
@@ -139,9 +116,6 @@ def get(key, system='default'):
     """Lookup's the storage node in the
     lookup ring and return's the stored value
     """
-    if hasattr(local_cache, '%s%s' % (system, hash(key))):
-        return getattr(local_cache, '%s%s' % (system, hash(key)))
-
     #Try to look it up directly
     result = None
 
@@ -157,11 +131,6 @@ def get(key, system='default'):
 
         if storage_node:
             result = storage_node.get(key)
-
-    setattr(local_cache, '%s%s' % (system, hash(key)), result)
-
-    if len(dir(local_cache)) > 750:
-        clean_local_cache()
 
     return result
 
@@ -182,9 +151,6 @@ def delete(key, system='default'):
     if storage_node:
         storage_node.delete(key)
 
-    if hasattr(local_cache, '%s%s' % (system, hash(key))):
-        delattr(local_cache, '%s%s' % (system, hash(key)))
-
     return True
 
 
@@ -195,10 +161,6 @@ def set(key, value, system='default'):
     then the storage node is determinted by using hash_ring.
     """
     storage_node = locate_node_or_init(key, system)
-
-    if hasattr(local_cache, '%s%s' % (system, hash(key))):
-        delattr(local_cache, '%s%s' % (system, hash(key)))
-
     return storage_node.set(key, value)
 
 
@@ -256,22 +218,29 @@ def _clean_up_ring(key, value, system):
 
 
 #--- Helpers ----------------------------------------------
-def generate_ring(nodes, name_to_obj):
+def close_open_connections():
+    """Closes open connections to nodes"""
+    tryant_close()
+    redis_close()
+
+
+def generate_ring(nodes, name_to_obj, node_type=None):
     """Given a set of nodes it created nodes's
     and returns a hash ring with them"""
-    global default_node
 
-    if not default_node:
-        default_node = TyrantNode
+    global default_node
+    if not node_type:
+        node_type = default_node
 
     objects = []
 
     for name in nodes:
-        obj = default_node(name, nodes[name])
+        obj = node_type(name, nodes[name])
         name_to_obj[name] = obj
         objects.append( obj )
 
     return HashRing(objects)
+
 
 def regenerate_ring(system='default'):
     try:
@@ -283,9 +252,3 @@ def regenerate_ring(system='default'):
         pass
 
     init(get_lookup_ring(system).nodes, get_storage_ring(system).nodes, system)
-
-def clean_local_cache():
-    keys = dir(local_cache)
-    for k in keys:
-        if '__' not in k:
-            delattr(local_cache, k)

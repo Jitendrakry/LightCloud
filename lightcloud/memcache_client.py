@@ -31,6 +31,9 @@ class MemcacheClient(memcache.Client):
     def list_remove(self, key, values):
         pass
 
+    def list_get(self, key):
+        return []
+
 
 class MemcachedNode(MemcacheClient):
     """Extends the memcached client with a proper __str__ method"""

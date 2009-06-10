@@ -1,4 +1,4 @@
-"""Pure python implementation of the binary Tokyo Tyrant 1.1.11 protocol
+"""Pure python implementation of the binary Tokyo Tyrant 1.1.17 protocol
 
 Tokyo Cabinet <http://tokyocabinet.sourceforge.net/> is a "super hyper ultra
 database manager" written and maintained by Mikio Hirabayashi and released
@@ -7,7 +7,7 @@ under the LGPL.
 Tokyo Tyrant is the de facto database server for Tokyo Cabinet written and
 maintained by the same author. It supports a REST HTTP protocol, memcached,
 and its own simple binary protocol. This library implements the full binary
-protocol for the Tokyo Tyrant 1.1.11 in pure Python as defined here::
+protocol for the Tokyo Tyrant 1.1.17 in pure Python as defined here::
 
     http://tokyocabinet.sourceforge.net/tyrantdoc/
 
@@ -23,11 +23,12 @@ for the raw Tyrant protocol::
     >>> del t['__test_key__']
 
 """
+import math
 import socket
 import struct
 import UserDict
 
-__version__ = '1.1.12'
+__version__ = '1.1.17'
 
 __all__ = [
     'Tyrant', 'TyrantError', 'PyTyrant',
@@ -37,12 +38,15 @@ __all__ = [
 class TyrantError(Exception):
     pass
 
+
 DEFAULT_PORT = 1978
 MAGIC = 0xc8
+
 
 RDBMONOULOG = 1 << 0
 RDBXOLCKREC = 1 << 0
 RDBXOLCKGLB = 1 << 1
+
 
 class C(object):
     """
@@ -73,14 +77,17 @@ class C(object):
     stat = 0x88
     misc = 0x90
 
+
 def _t0(code):
     return [chr(MAGIC) + chr(code)]
+
 
 def _t1(code, key):
     return [
         struct.pack('>BBI', MAGIC, code, len(key)),
         key,
     ]
+
 
 def _t1FN(code, func, opts, args):
     outlst = [
@@ -98,17 +105,20 @@ def _t1R(code, key, msec):
         key,
     ]
 
+
 def _t1M(code, key, count):
     return [
         struct.pack('>BBII', MAGIC, code, len(key), count),
         key,
     ]
 
+
 def _tN(code, klst):
     outlst = [struct.pack('>BBI', MAGIC, code, len(klst))]
     for k in klst:
         outlst.extend([struct.pack('>I', len(k)), k])
     return outlst
+
 
 def _t2(code, key, value):
     return [
@@ -117,12 +127,14 @@ def _t2(code, key, value):
         value,
     ]
 
+
 def _t2W(code, key, value, width):
     return [
         struct.pack('>BBIII', MAGIC, code, len(key), len(value), width),
         key,
         value,
     ]
+
 
 def _t3F(code, func, opts, key, value):
     return [
@@ -132,9 +144,17 @@ def _t3F(code, func, opts, key, value):
         value,
     ]
 
+
+def _tDouble(code, key, integ, fract):
+    return [
+        struct.pack('>BBIQQ', MAGIC, code, len(key), integ, fract),
+        key,
+    ]
+
+
 def socksend(sock, lst):
-    for chunk in lst:
-        sock.sendall(chunk)
+    sock.sendall(''.join(lst))
+
 
 def sockrecv(sock, bytes):
     d = ''
@@ -142,19 +162,29 @@ def sockrecv(sock, bytes):
         d += sock.recv(min(8192, bytes - len(d)))
     return d
 
+
 def socksuccess(sock):
     fail_code = ord(sockrecv(sock, 1))
     if fail_code:
         raise TyrantError(fail_code)
 
+
 def socklen(sock):
     return struct.unpack('>I', sockrecv(sock, 4))[0]
+
 
 def socklong(sock):
     return struct.unpack('>Q', sockrecv(sock, 8))[0]
 
+
 def sockstr(sock):
     return sockrecv(sock, socklen(sock))
+
+
+def sockdouble(sock):
+    intpart, fracpart = struct.unpack('>QQ', sockrecv(sock, 16))
+    return intpart + (fracpart * 1e-12)
+
 
 def sockstrpair(sock):
     klen = socklen(sock)
@@ -162,6 +192,7 @@ def sockstrpair(sock):
     k = sockrecv(sock, klen)
     v = sockrecv(sock, vlen)
     return k, v
+
 
 class PyTyrant(object, UserDict.DictMixin):
     """
@@ -311,8 +342,6 @@ class Tyrant(object):
         sock = socket.socket()
         sock.connect((host, port))
         sock.setsockopt(socket.SOL_TCP, socket.TCP_NODELAY, 1)
-        cls.port = port
-        cls.host = host
         return cls(sock)
 
     def __init__(self, sock):
@@ -412,6 +441,18 @@ class Tyrant(object):
         """
         return list(self._fwmkeys(prefix, maxkeys))
 
+    def addint(self, key, num):
+        socksend(self.sock, _t1M(C.addint, key, num))
+        socksuccess(self.sock)
+        return socklen(self.sock)
+
+    def adddouble(self, key, num):
+        fracpart, intpart = math.modf(num)
+        fracpart, intpart = int(fracpart * 1e12), int(intpart)
+        socksend(self.sock, _tDouble(C.adddouble, key, fracpart, intpart))
+        socksuccess(self.sock)
+        return sockdouble(self.sock)
+
     def ext(self, func, opts, key, value):
         # tcrdbext opts are RDBXOLCKREC, RDBXOLCKGLB
         """Call func(key, value) with opts
@@ -421,12 +462,6 @@ class Tyrant(object):
         socksend(self.sock, _t3F(C.ext, func, opts, key, value))
         socksuccess(self.sock)
         return sockstr(self.sock)
-
-    def call_func(self, func, key, value, record_locking=False, global_locking=False):
-        opts = (
-            (record_locking and RDBXOLCKREC or 0) |
-            (global_locking and RDBXOLCKGLB or 0))
-        return self.ext(func, opts, key, value)
 
     def sync(self):
         """Synchronize the database
@@ -482,8 +517,10 @@ class Tyrant(object):
     def _misc(self, func, opts, args):
         # tcrdbmisc opts are RDBMONOULOG
         socksend(self.sock, _t1FN(C.misc, func, opts, args))
-        socksuccess(self.sock)
-        numrecs = socklen(self.sock)
+        try:
+            socksuccess(self.sock)
+        finally:
+            numrecs = socklen(self.sock)
         for i in xrange(numrecs):
             yield sockstr(self.sock)
 
@@ -499,9 +536,11 @@ class Tyrant(object):
         """
         return list(self._misc(func, opts, args))
 
+
 def main():
     import doctest
     doctest.testmod()
+
 
 if __name__ == '__main__':
     main()
