@@ -70,6 +70,7 @@ class RedisClient:
                 db = get_connection(host, port)
                 return getattr(db, operation)(*k, **kw)
             except Exception, e:
+                print e
                 exp = e
                 continue
 
