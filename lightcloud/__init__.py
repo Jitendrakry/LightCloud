@@ -139,16 +139,14 @@ def delete(key, system='default'):
     """Lookup's the storage node in the lookup ring
     and deletes the key from lookup ring and storage node
     """
-    storage_node = locate_node(key, system)
-    if not storage_node:
-        storage_node = get_storage_ring(system).get_node(key)
-
     for i, lookup_node in enumerate(get_lookup_ring(system).iterate_nodes(key)):
-        if i > 1:
+        if i > 0:
             break
         lookup_node.delete(key)
 
-    if storage_node:
+    for i, storage_node in enumerate(get_storage_ring(system).iterate_nodes(key)):
+        if i > 0:
+            break
         storage_node.delete(key)
 
     return True

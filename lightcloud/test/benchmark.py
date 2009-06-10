@@ -26,11 +26,12 @@ lightcloud.init(lookup_nodes, storage_nodes, node_type=lightcloud.TyrantNode, sy
 #--- Run the tests ----------------------------------------------
 def generic_bench(name, times_run, fn):
     start = time()
-    print 'Running "%s" %s times...' % (name, times_run)
     for i in range(0, times_run):
         fn()
-    print 'Finished "%s" in %s' % (name, time()-start)
-    print '------'
+    end = time()-start
+    pr_sec = float(times_run)/end
+    print 'Finished "%s" %s times in %0.2f sec [%0.1f operations pr.sec]' %\
+            (name, times_run, end, pr_sec)
 
 
 #--- Support ----------------------------------------------
@@ -39,15 +40,21 @@ generic_bench('Tyrant set', 10000,
 generic_bench('Redis set', 10000,
               lambda: lightcloud.set('hello', 'world', system='redis'))
 
+print '------'
+
 generic_bench('Tyrant get', 10000,
               lambda: lightcloud.get('hello', system='tyrant'))
 generic_bench('Redis get', 10000,
               lambda: lightcloud.get('hello', system='redis'))
 
+print '------'
+
 generic_bench('Tyrant list_add', 10000,
               lambda: lightcloud.list_add('hello_l', ['1'], system='tyrant'))
 generic_bench('Redis list_add', 10000,
               lambda: lightcloud.list_add('hello_l', ['1'], system='redis'))
+
+print '------'
 
 generic_bench('Tyrant delete', 10000,
               lambda: lightcloud.delete('hello', system='tyrant'))
