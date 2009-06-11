@@ -36,6 +36,9 @@ class RedisClient:
             return False
 
     #--- List ----------------------------------------------
+    def list_init(self, key):
+        self.delete(key)
+
     def list_add(self, key, values, limit=200):
         for val in reversed(values):
             self.call_db(key, 'push', key, val, tail=True)

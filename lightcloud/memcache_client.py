@@ -25,6 +25,9 @@ class MemcacheClient(memcache.Client):
         return result
 
     #--- List fn ----------------------------------------------
+    def list_init(self, key):
+        pass
+
     def list_add(self, key, values):
         pass
 

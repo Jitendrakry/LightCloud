@@ -79,7 +79,8 @@ def incr(key, delta=1, system='default'):
 #--- List ----------------------------------------------
 def list_init(key, system='default'):
     key = 'll_%s' % key
-    set(key, '', system)
+    storage_node = locate_node_or_init(key, system)
+    return storage_node.list_init(key)
 
 def list_get(key, system='default', **kw):
     key = 'll_%s' % key
