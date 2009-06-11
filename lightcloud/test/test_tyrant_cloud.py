@@ -47,6 +47,12 @@ def test_limit_add():
     assert len(lightcloud.list_get('hello')) == 200
 
     lightcloud.list_varnish('hello')
-    for i in range(0, 50):
+    for i in range(0, 100):
         lightcloud.list_add('hello', [i], limit=50)
     assert len(lightcloud.list_get('hello')) == 50
+
+    cur = lightcloud.list_get('hello')
+    i = 100
+    for elm in cur:
+        i -= 1
+        assert elm == str(i)
