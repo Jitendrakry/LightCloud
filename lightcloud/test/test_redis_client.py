@@ -34,7 +34,19 @@ def test_list():
 
     lightcloud.list_add('hello', ['1', '2', '3'])
     lightcloud.list_add('hello', ['4'])
-    assert lightcloud.list_get('hello') == ['1', '2', '3', '4']
+    assert lightcloud.list_get('hello') == ['4', '1', '2', '3']
 
     lightcloud.list_remove('hello', ['3'])
-    assert lightcloud.list_get('hello') == ['1', '2', '4']
+    assert lightcloud.list_get('hello') == ['4', '1', '2']
+
+def test_limit_add():
+    lightcloud.list_varnish('hello')
+
+    for i in range(0, 250):
+        lightcloud.list_add('hello', [i])
+    assert len(lightcloud.list_get('hello')) == 200
+
+    lightcloud.list_varnish('hello')
+    for i in range(0, 50):
+        lightcloud.list_add('hello', [i], limit=50)
+    assert len(lightcloud.list_get('hello')) == 50

@@ -67,6 +67,8 @@ class TyrantClient:
         return ''.join(v_encoded)
 
     def list_add(self, key, values, limit=200):
+        if limit != 200:
+            key = '%s|%s' % (limit, key)
         return self.call_db(key, 'ext',
                             'list_add', pytyrant.RDBXOLCKREC,
                             key, self._encode_list(values))
