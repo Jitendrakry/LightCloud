@@ -42,7 +42,8 @@ class TyrantClient:
             self.call_db(key, 'put',
                          key, val)
             return True
-        except:
+        except Exception, e:
+            print e
             return False
 
     def get(self, key, **kw):

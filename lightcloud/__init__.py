@@ -222,7 +222,6 @@ def close_open_connections():
     tryant_close()
     redis_close()
 
-
 def generate_ring(nodes, name_to_obj, node_type=None):
     """Given a set of nodes it created nodes's
     and returns a hash ring with them"""
