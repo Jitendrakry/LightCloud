@@ -159,7 +159,10 @@ def socksend(sock, lst):
 def sockrecv(sock, bytes):
     d = ''
     while len(d) < bytes:
-        d += sock.recv(min(8192, bytes - len(d)))
+        c = sock.recv(min(8192, bytes - len(d)))
+        if not c:
+            raise socket.error('server disconnected unexpectedly')
+        d += c
     return d
 
 
@@ -338,10 +341,11 @@ class PyTyrant(object, UserDict.DictMixin):
 
 class Tyrant(object):
     @classmethod
-    def open(cls, host='127.0.0.1', port=DEFAULT_PORT):
+    def open(cls, host='127.0.0.1', port=DEFAULT_PORT, timeout=3.0):
         sock = socket.socket()
-        sock.connect((host, port))
+        sock.settimeout(timeout)
         sock.setsockopt(socket.SOL_TCP, socket.TCP_NODELAY, 1)
+        sock.connect((host, port))
         return cls(sock)
 
     def __init__(self, sock):
