@@ -1,4 +1,5 @@
 import threading
+import types
 
 import pytyrant
 
@@ -17,11 +18,15 @@ def get_connection(host, port):
 
     return getattr(connections, key)
 
+def close_connection(key):
+    if hasattr(connections, key):
+        getattr(connections, key).close()
+        delattr(connections, key)
+
 def close_open_connections():
     for key in dir(connections):
         if '__' not in key:
-            getattr(connections, key).close()
-            delattr(connections, key)
+            close_connection(key)
 
 
 #--- pytyrant client ----------------------------------------------
@@ -43,7 +48,6 @@ class TyrantClient:
                          key, val)
             return True
         except Exception, e:
-            print e
             return False
 
     def get(self, key, **kw):
@@ -101,6 +105,8 @@ class TyrantClient:
 
         exp = Exception("unknown")
 
+        tried_servers = {}
+
         while len(servers) > 0:
             host, port = pick_server(key, servers)
 
@@ -108,6 +114,14 @@ class TyrantClient:
                 db = get_connection(host, port)
                 return getattr(db, operation)(*k, **kw)
             except Exception, e:
+                server_key = '%s:%s' % (host, port)
+
+                if not server_key in tried_servers:
+                    close_connection(server_key)
+                    servers.append( (host, port) )
+                    tried_servers[server_key] = True
+                    continue
+
                 exp = e
                 continue
 
