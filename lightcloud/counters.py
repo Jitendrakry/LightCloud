@@ -57,13 +57,14 @@ def reset_day_counter(key, days=10, system='default'):
     return True
 
 
-def get_stats_by_date(vars, offset=None, limit=20):
+def get_stats_by_date(vars, offset=None, limit=20, system='default'):
     var_data = {}
 
     for var in vars:
         var_data[var] = get_day_counts(var,
                                        offset=offset,
-                                       limit=limit)
+                                       limit=limit,
+                                       system=system)
 
     result = []
     for i in xrange(0, limit):
