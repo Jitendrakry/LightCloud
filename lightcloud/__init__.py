@@ -136,6 +136,10 @@ def get(key, system='default'):
     return result
 
 
+def get_multi(keys, system='default'):
+    """Look up multiple keys at once."""
+
+
 def delete(key, system='default'):
     """Lookup's the storage node in the lookup ring
     and deletes the key from lookup ring and storage node

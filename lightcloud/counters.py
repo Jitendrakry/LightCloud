@@ -15,7 +15,7 @@ def get_counts(key, system='default'):
     return 0
 
 def reset_counter(key, system='default'):
-    return lightcloud.delete(_key(key))
+    return lightcloud.delete(_key(key), system=system)
 
 
 
@@ -33,7 +33,7 @@ def get_day_counts(key, offset=None, limit=10, system='default'):
     for i in xrange(0, limit):
         day_key = '%s_%s' % (_key(key), _format_date(offset))
 
-        count = lightcloud.get(day_key) or 0
+        count = lightcloud.get(day_key, system=system) or 0
         if count:
             count = long(count)
 
@@ -51,10 +51,30 @@ def reset_day_counter(key, days=10, system='default'):
 
     for i in xrange(0, days):
         day_key = '%s_%s' % (_key(key), _format_date(date))
-        lightcloud.delete(day_key)
+        lightcloud.delete(day_key, system=system)
         date = _previous_day(date)
 
     return True
+
+
+def get_stats_by_date(vars, offset=None, limit=20):
+    var_data = {}
+
+    for var in vars:
+        var_data[var] = get_day_counts(var,
+                                       offset=offset,
+                                       limit=limit)
+
+    result = []
+    for i in xrange(0, limit):
+        stat = {}
+        for var in vars:
+            data = var_data[var]
+            stat[var] = data[i]['counts']
+            stat['date'] = data[i]['date']
+        result.append(stat)
+
+    return result
 
 
 #--- Helpers ----------------------------------------------
