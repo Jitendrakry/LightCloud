@@ -12,12 +12,13 @@ from redis_client import RedisNode, close_open_connections as redis_close, get_c
 
 
 #--- Global ----------------------------------------------
-use_local_cache = True
+LOOKUP_LOOKS = 2
+USE_LOCAL_CACHE = True
 
 default_node = TyrantNode
 
-systems = {}
-local_cache = local()
+SYSTEMS = {}
+LOCAL_CACHE = local()
 
 
 #--- Init and config ----------------------------------------------
@@ -28,7 +29,7 @@ def init(lookup_nodes, storage_nodes, system='default', node_type=None):
     lookup_ring = generate_ring(lookup_nodes, name_to_l_node, node_type)
     storage_ring = generate_ring(storage_nodes, name_to_s_node, node_type)
 
-    systems[system] = (lookup_ring, storage_ring,
+    SYSTEMS[system] = (lookup_ring, storage_ring,
                        name_to_l_node, name_to_s_node)
 
 
@@ -47,42 +48,42 @@ def generate_nodes(lc_config):
 
 #--- System accessors ----------------------------------------------
 def get_lookup_ring(system='default'):
-    return systems[system][0]
+    return SYSTEMS[system][0]
 
 def get_storage_ring(system='default'):
-    return systems[system][1]
+    return SYSTEMS[system][1]
 
 
 #--- Node accessors ----------------------------------------------
 def storage_nodes(system='default'):
     """Returns the storage nodes in the storage ring"""
-    for node in systems[system][3].values():
+    for node in SYSTEMS[system][3].values():
         yield node
 
 def lookup_nodes(system='default'):
     """Returns the lookup nodes in the lookup ring"""
-    for node in systems[system][2].values():
+    for node in SYSTEMS[system][2].values():
         yield node
 
 def get_storage_node(name, system='default'):
     """Returns a storage node by its name"""
-    return systems[system][3].get(name)
+    return SYSTEMS[system][3].get(name)
 
 def get_lookup_node(name, system='default'):
     """Returns a lookup node by its name"""
-    return systems[system][2].get(name)
+    return SYSTEMS[system][2].get(name)
 
 
 #--- Local cache ----------------------------------------------
 def expire_cache():
-    for key in dir(local_cache):
+    for key in dir(LOCAL_CACHE):
         if key.find('_') != 0:
-            delattr(local_cache, key)
+            delattr(LOCAL_CACHE, key)
 
 def expire_key(key):
-    if use_local_cache:
-        if hasattr(local_cache, key):
-            delattr(local_cache, key)
+    if USE_LOCAL_CACHE:
+        if hasattr(LOCAL_CACHE, key):
+            delattr(LOCAL_CACHE, key)
 
 
 #--- Operations ----------------------------------------------
@@ -133,9 +134,9 @@ def get(key, system='default'):
     """Lookup's the storage node in the
     lookup ring and return's the stored value
     """
-    if use_local_cache:
-        if hasattr(local_cache, key):
-            return getattr(local_cache, key)
+    if USE_LOCAL_CACHE:
+        if hasattr(LOCAL_CACHE, key):
+            return getattr(LOCAL_CACHE, key)
 
     #Try to look it up directly
     result = None
@@ -153,8 +154,8 @@ def get(key, system='default'):
         if storage_node:
             result = storage_node.get(key)
 
-    if use_local_cache:
-        setattr(local_cache, key, result)
+    if USE_LOCAL_CACHE:
+        setattr(LOCAL_CACHE, key, result)
 
     return result
 
@@ -186,8 +187,8 @@ def set(key, value, system='default'):
     """
     storage_node = locate_node_or_init(key, system)
 
-    if use_local_cache:
-        setattr(local_cache, key, value)
+    if USE_LOCAL_CACHE:
+        setattr(LOCAL_CACHE, key, value)
 
     return storage_node.set(key, value)
 
@@ -211,7 +212,7 @@ def locate_node(key, system='default'):
     """
     nodes = get_lookup_ring(system).iterate_nodes(key)
     for lookups, node in enumerate(nodes):
-        if lookups > 2:
+        if lookups >= LOOKUP_LOOKS:
             return None
 
         value = node.get(key)
