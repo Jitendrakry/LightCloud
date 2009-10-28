@@ -12,9 +12,12 @@ from redis_client import RedisNode, close_open_connections as redis_close, get_c
 
 
 #--- Global ----------------------------------------------
+use_local_cache = True
+
 default_node = TyrantNode
 
 systems = {}
+local_cache = local()
 
 
 #--- Init and config ----------------------------------------------
@@ -70,9 +73,22 @@ def get_lookup_node(name, system='default'):
     return systems[system][2].get(name)
 
 
+#--- Local cache ----------------------------------------------
+def expire_cache():
+    for key in dir(local_cache):
+        if key.find('_') != 0:
+            delattr(local_cache, key)
+
+def expire_key(key):
+    if use_local_cache:
+        if hasattr(local_cache, key):
+            delattr(local_cache, key)
+
+
 #--- Operations ----------------------------------------------
 def incr(key, delta=1, system='default'):
     storage_node = locate_node_or_init(key, system)
+    expire_key(key)
     return storage_node.incr(key, delta)
 
 
@@ -117,6 +133,10 @@ def get(key, system='default'):
     """Lookup's the storage node in the
     lookup ring and return's the stored value
     """
+    if use_local_cache:
+        if hasattr(local_cache, key):
+            return getattr(local_cache, key)
+
     #Try to look it up directly
     result = None
 
@@ -133,11 +153,10 @@ def get(key, system='default'):
         if storage_node:
             result = storage_node.get(key)
 
+    if use_local_cache:
+        setattr(local_cache, key, result)
+
     return result
-
-
-def get_multi(keys, system='default'):
-    """Look up multiple keys at once."""
 
 
 def delete(key, system='default'):
@@ -154,6 +173,8 @@ def delete(key, system='default'):
             break
         storage_node.delete(key)
 
+    expire_key(key)
+
     return True
 
 
@@ -164,6 +185,10 @@ def set(key, value, system='default'):
     then the storage node is determinted by using hash_ring.
     """
     storage_node = locate_node_or_init(key, system)
+
+    if use_local_cache:
+        setattr(local_cache, key, value)
+
     return storage_node.set(key, value)
 
 
