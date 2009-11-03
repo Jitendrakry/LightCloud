@@ -25,6 +25,7 @@ def update_day_counter(key, delta=1, system='default'):
     day_key = '%s_%s' % (_key(key), _format_date(now))
     return lightcloud.incr(day_key, delta=delta, system=system)
 
+
 def get_day_counts(key, offset=None, limit=10, system='default'):
     if not offset:
         offset = _get_now()
