@@ -48,6 +48,7 @@ class TyrantClient:
                          key, val)
             return True
         except Exception, e:
+            print e
             return False
 
     def get(self, key, **kw):

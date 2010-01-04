@@ -1,5 +1,3 @@
-from threading import local
-
 from hash_ring import HashRing
 
 try:
@@ -10,15 +8,18 @@ except ImportError, e:
 from tyrant_client import TyrantNode, close_open_connections as tryant_close, get_connection
 from redis_client import RedisNode, close_open_connections as redis_close, get_connection
 
+from local_cache import get_local_cache
+
 
 #--- Global ----------------------------------------------
 LOOKUP_LOOKS = 2
-USE_LOCAL_CACHE = True
 
-default_node = TyrantNode
+USE_CACHE = True
+GET_CACHE = get_local_cache
 
 SYSTEMS = {}
-LOCAL_CACHE = local()
+
+default_node = TyrantNode
 
 
 #--- Init and config ----------------------------------------------
@@ -74,16 +75,13 @@ def get_lookup_node(name, system='default'):
     return SYSTEMS[system][2].get(name)
 
 
-#--- Local cache ----------------------------------------------
+#--- Cache ----------------------------------------------
 def expire_cache():
-    for key in dir(LOCAL_CACHE):
-        if key.find('_') != 0:
-            delattr(LOCAL_CACHE, key)
+    pass
 
 def expire_key(key):
-    if USE_LOCAL_CACHE:
-        if hasattr(LOCAL_CACHE, key):
-            delattr(LOCAL_CACHE, key)
+    if USE_CACHE:
+        GET_CACHE().delete(key)
 
 
 #--- Operations ----------------------------------------------
@@ -97,28 +95,43 @@ def incr(key, delta=1, system='default'):
 def list_init(key, system='default'):
     key = 'll_%s' % key
     storage_node = locate_node_or_init(key, system)
+    expire_key(key)
     return storage_node.list_init(key)
 
 def list_get(key, system='default', **kw):
     key = 'll_%s' % key
+
+    if USE_CACHE:
+        val = GET_CACHE().get(key)
+        if val:
+            return val
+
     storage_node = locate_node_or_init(key, system)
-    return storage_node.list_get(key, **kw)
+    val = storage_node.list_get(key, **kw)
+
+    if USE_CACHE:
+        GET_CACHE().set(key, val)
+
+    return val
 
 def list_add(key, values, system='default', limit=200):
     key = 'll_%s' % key
     storage_node = locate_node_or_init(key, system)
     result = storage_node.list_add(key, values, limit)
+    expire_key(key)
     return result
 
 def list_remove(key, values, system='default'):
     key = 'll_%s' % key
     storage_node = locate_node_or_init(key, system)
     result = storage_node.list_remove(key, values)
+    expire_key(key)
     return result
 
 def list_varnish(key, system='default'):
     key = 'll_%s' % key
     result = delete(key, system)
+    expire_key(key)
     return result
 
 def list_is_created(key, system='default'):
@@ -134,9 +147,10 @@ def get(key, system='default'):
     """Lookup's the storage node in the
     lookup ring and return's the stored value
     """
-    if USE_LOCAL_CACHE:
-        if hasattr(LOCAL_CACHE, key):
-            return getattr(LOCAL_CACHE, key)
+    if USE_CACHE:
+        value = GET_CACHE().get(key)
+        if value:
+            return value
 
     #Try to look it up directly
     result = None
@@ -154,8 +168,8 @@ def get(key, system='default'):
         if storage_node:
             result = storage_node.get(key)
 
-    if USE_LOCAL_CACHE:
-        setattr(LOCAL_CACHE, key, result)
+    if USE_CACHE:
+        GET_CACHE().set(key, result)
 
     return result
 
@@ -187,8 +201,8 @@ def set(key, value, system='default'):
     """
     storage_node = locate_node_or_init(key, system)
 
-    if USE_LOCAL_CACHE:
-        setattr(LOCAL_CACHE, key, value)
+    if USE_CACHE:
+        GET_CACHE().set(key, value)
 
     return storage_node.set(key, value)
 
