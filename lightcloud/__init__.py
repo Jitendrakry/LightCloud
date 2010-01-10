@@ -143,14 +143,15 @@ def list_is_created(key, system='default'):
 
 
 #--- Get, set and delete ----------------------------------------------
-def get(key, system='default'):
+def get(key, system='default', enable_cache=True):
     """Lookup's the storage node in the
     lookup ring and return's the stored value
     """
-    if USE_CACHE:
-        value = GET_CACHE().get(key)
-        if value:
-            return value
+    if enable_cache:
+        if USE_CACHE:
+            value = GET_CACHE().get(key)
+            if value:
+                return value
 
     #Try to look it up directly
     result = None
