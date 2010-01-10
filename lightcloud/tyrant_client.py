@@ -48,7 +48,6 @@ class TyrantClient:
                          key, val)
             return True
         except Exception, e:
-            print e
             return False
 
     def get(self, key, **kw):
@@ -95,6 +94,9 @@ class TyrantClient:
 
     #--- db man ----------------------------------------------
     def call_db(self, key, operation, *k, **kw):
+        if type(key) == types.UnicodeType:
+            key = key.encode('utf8')
+
         key_hash = hash(key)
 
         def pick_server(skey, servers):
