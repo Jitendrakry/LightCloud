@@ -38,11 +38,14 @@ class TyrantClient:
 
     #--- Incr and decr ----------------------------------------------
     def incr(self, key, delta=1):
+        key = encode_key(key)
         return self.call_db(key, 'ext',
                             'incr', pytyrant.RDBXOLCKREC, key, "%s" % delta)
 
     #--- Set, get and delete ----------------------------------------------
     def set(self, key, val, **kw):
+        key = encode_key(key)
+
         try:
             self.call_db(key, 'put',
                          key, val)
@@ -51,6 +54,8 @@ class TyrantClient:
             return False
 
     def get(self, key, **kw):
+        key = encode_key(key)
+
         try:
             val = self.call_db(key, 'get', key)
         except Exception, e:
@@ -58,6 +63,8 @@ class TyrantClient:
         return val
 
     def delete(self, key):
+        key = encode_key(key)
+
         try:
             self.call_db(key, 'out', key)
             return True
@@ -72,9 +79,11 @@ class TyrantClient:
         return ''.join(v_encoded)
 
     def list_init(self, key):
+        key = encode_key(key)
         self.set(key, '')
 
     def list_add(self, key, values, limit=200):
+        key = encode_key(key)
         if limit != 200:
             key = '%s|%s' % (limit, key)
         return self.call_db(key, 'ext',
@@ -82,11 +91,13 @@ class TyrantClient:
                             key, self._encode_list(values))
 
     def list_remove(self, key, values):
+        key = encode_key(key)
         return self.call_db(key, 'ext',
                             'list_remove', pytyrant.RDBXOLCKREC,
                             key, self._encode_list(values))
 
     def list_get(self, key):
+        key = encode_key(key)
         value = self.get(key)
         if value:
             return [ v for v in value.split(r'~') if v ]
@@ -94,9 +105,6 @@ class TyrantClient:
 
     #--- db man ----------------------------------------------
     def call_db(self, key, operation, *k, **kw):
-        if type(key) == types.UnicodeType:
-            key = key.encode('utf8')
-
         key_hash = hash(key)
 
         def pick_server(skey, servers):
@@ -130,6 +138,7 @@ class TyrantClient:
 
         raise exp
 
+
 class TyrantNode(TyrantClient):
     """Extends the tyrant client with a proper __str__ method"""
 
@@ -139,3 +148,9 @@ class TyrantNode(TyrantClient):
 
     def __str__(self):
         return self.name
+
+
+def encode_key(key):
+    if type(key) == types.UnicodeType:
+        key = key.encode('utf8')
+    return key
