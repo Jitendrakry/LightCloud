@@ -110,7 +110,7 @@ def list_get(key, system='default', **kw):
     val = storage_node.list_get(key, **kw)
 
     if USE_CACHE:
-        GET_CACHE().set(key, val)
+        GET_CACHE().set(key, val, time=0)
 
     return val
 
@@ -170,7 +170,7 @@ def get(key, system='default', enable_cache=True):
             result = storage_node.get(key)
 
     if USE_CACHE:
-        GET_CACHE().set(key, result)
+        GET_CACHE().set(key, result, time=0)
 
     return result
 
@@ -203,7 +203,7 @@ def set(key, value, system='default'):
     storage_node = locate_node_or_init(key, system)
 
     if USE_CACHE:
-        GET_CACHE().set(key, value)
+        GET_CACHE().set(key, value, time=0)
 
     return storage_node.set(key, value)
 
