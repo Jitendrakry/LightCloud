@@ -45,6 +45,10 @@ class RedisClient:
         self.call_db(key, 'ltrim', key, 0, limit-1)
         return True
 
+    def list_set(self, key, values):
+        self.list_init(key)
+        self.list_add(key, values)
+
     def list_remove(self, key, values):
         for val in values:
             self.call_db(key, 'lrem', key, val)

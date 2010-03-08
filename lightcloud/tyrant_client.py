@@ -90,6 +90,11 @@ class TyrantClient:
                             'list_add', pytyrant.RDBXOLCKREC,
                             key, self._encode_list(values))
 
+    def list_set(self, key, values):
+        key = encode_key(key)
+        values = self._encode_list(values)
+        return self.set(key, self._encode_list(values))
+
     def list_remove(self, key, values):
         key = encode_key(key)
         return self.call_db(key, 'ext',

@@ -121,6 +121,13 @@ def list_add(key, values, system='default', limit=200):
     expire_key(key)
     return result
 
+def list_set(key, values, system='default'):
+    key = 'll_%s' % key
+    storage_node = locate_node_or_init(key, system)
+    result = storage_node.list_set(key, values)
+    expire_key(key)
+    return result
+
 def list_remove(key, values, system='default'):
     key = 'll_%s' % key
     storage_node = locate_node_or_init(key, system)

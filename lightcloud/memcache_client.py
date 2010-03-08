@@ -31,6 +31,9 @@ class MemcacheClient(memcache.Client):
     def list_add(self, key, values):
         pass
 
+    def list_set(self, key, values):
+        pass
+
     def list_remove(self, key, values):
         pass
 
