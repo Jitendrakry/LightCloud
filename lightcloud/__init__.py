@@ -75,19 +75,10 @@ def get_lookup_node(name, system='default'):
     return SYSTEMS[system][2].get(name)
 
 
-#--- Cache ----------------------------------------------
-def expire_cache():
-    pass
-
-def expire_key(key):
-    if USE_CACHE:
-        GET_CACHE().delete(key)
-
-
 #--- Operations ----------------------------------------------
 def incr(key, delta=1, system='default'):
     storage_node = locate_node_or_init(key, system)
-    expire_key(key)
+    cache_delete(key, system)
     return storage_node.incr(key, delta)
 
 
@@ -95,14 +86,14 @@ def incr(key, delta=1, system='default'):
 def list_init(key, system='default'):
     key = 'll_%s' % key
     storage_node = locate_node_or_init(key, system)
-    expire_key(key)
+    cache_delete(key, system)
     return storage_node.list_init(key)
 
 def list_get(key, system='default', **kw):
     key = 'll_%s' % key
 
     if USE_CACHE:
-        val = GET_CACHE().get(key)
+        val = cache_get(key, system)
         if val:
             return val
 
@@ -110,7 +101,7 @@ def list_get(key, system='default', **kw):
     val = storage_node.list_get(key, **kw)
 
     if USE_CACHE:
-        GET_CACHE().set(key, val, time=0)
+        cache_set(key, val, system=system)
 
     return val
 
@@ -118,27 +109,27 @@ def list_add(key, values, system='default', limit=200):
     key = 'll_%s' % key
     storage_node = locate_node_or_init(key, system)
     result = storage_node.list_add(key, values, limit)
-    expire_key(key)
+    cache_delete(key, system)
     return result
 
 def list_set(key, values, system='default'):
     key = 'll_%s' % key
     storage_node = locate_node_or_init(key, system)
     result = storage_node.list_set(key, values)
-    expire_key(key)
+    cache_delete(key, system)
     return result
 
 def list_remove(key, values, system='default'):
     key = 'll_%s' % key
     storage_node = locate_node_or_init(key, system)
     result = storage_node.list_remove(key, values)
-    expire_key(key)
+    cache_delete(key, system)
     return result
 
 def list_varnish(key, system='default'):
     key = 'll_%s' % key
     result = delete(key, system)
-    expire_key(key)
+    cache_delete(key, system)
     return result
 
 def list_is_created(key, system='default'):
@@ -156,7 +147,7 @@ def get(key, system='default', enable_cache=True):
     """
     if enable_cache:
         if USE_CACHE:
-            value = GET_CACHE().get(key)
+            value = cache_get(key, system)
             if value:
                 return value
 
@@ -177,7 +168,7 @@ def get(key, system='default', enable_cache=True):
             result = storage_node.get(key)
 
     if USE_CACHE:
-        GET_CACHE().set(key, result, time=0)
+        cache_set(key, result, system=system)
 
     return result
 
@@ -196,7 +187,7 @@ def delete(key, system='default'):
             break
         storage_node.delete(key)
 
-    expire_key(key)
+    cache_delete(key, system)
 
     return True
 
@@ -210,7 +201,7 @@ def set(key, value, system='default'):
     storage_node = locate_node_or_init(key, system)
 
     if USE_CACHE:
-        GET_CACHE().set(key, value, time=0)
+        cache_set(key, value, system=system)
 
     return storage_node.set(key, value)
 
@@ -266,6 +257,23 @@ def _clean_up_ring(key, value, system):
             node.delete(key)
 
     return get_storage_node(value, system)
+
+
+#--- Cache layer ----------------------------------------------
+def cache_set(key, value, system='default', time=0):
+    key = '%s:%s' % (system, key)
+    GET_CACHE().set(key, value, time=time)
+
+def cache_get(key, value, system='default'):
+    key = '%s:%s' % (system, key)
+    GET_CACHE().get(key)
+
+def cache_delete(key, system='default'):
+    key = '%s:%s' % (system, key)
+    GET_CACHE().delete(key)
+
+def expire_cache():
+    pass
 
 
 #--- Helpers ----------------------------------------------
