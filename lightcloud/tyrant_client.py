@@ -40,7 +40,7 @@ class TyrantClient:
     def incr(self, key, delta=1):
         key = encode_key(key)
         return self.call_db(key, 'ext',
-                            'incr', pytyrant.RDBXOLCKREC, key, "%s" % delta)
+                            'incr', 0, key, "%s" % delta)
 
     #--- Set, get and delete ----------------------------------------------
     def set(self, key, val, **kw):
@@ -87,7 +87,7 @@ class TyrantClient:
         if limit != 200:
             key = '%s|%s' % (limit, key)
         return self.call_db(key, 'ext',
-                            'list_add', pytyrant.RDBXOLCKREC,
+                            'list_add', 0,
                             key, self._encode_list(values))
 
     def list_set(self, key, values):
@@ -98,7 +98,7 @@ class TyrantClient:
     def list_remove(self, key, values):
         key = encode_key(key)
         return self.call_db(key, 'ext',
-                            'list_remove', pytyrant.RDBXOLCKREC,
+                            'list_remove', 0,
                             key, self._encode_list(values))
 
     def list_get(self, key):
