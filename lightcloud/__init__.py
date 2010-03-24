@@ -112,7 +112,7 @@ def list_add(key, values, system='default', limit=200):
     values = map(str, values)
     only_new = [ v for v in values if v not in current_list ]
 
-    #Return if they all hav been added
+    #Return if they all have been added
     if len(only_new) == 0:
         return 'ok'
 
@@ -123,13 +123,12 @@ def list_add(key, values, system='default', limit=200):
         current_list.extend(only_new)
         storage_node = locate_node_or_init(list_key, system)
         result = storage_node.list_add(list_key, only_new, limit)
+        cache_set(list_key, current_list, system=system)
+        return 'ok'
     else:
         current_list.extend(only_new)
         current_list = current_list[-limit:]
-        list_set(key, current_list)
-
-    cache_set(list_key, current_list, system=system)
-    return 'ok'
+        return list_set(key, current_list)
 
 def list_remove(key, values, system='default'):
     values = map(str, values)
