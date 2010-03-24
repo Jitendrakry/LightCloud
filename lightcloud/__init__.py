@@ -122,25 +122,21 @@ def list_add(key, values, system='default', limit=200):
     return result
 
 def list_remove(key, values, system='default'):
-    key = 'll_%s' % key
+    current_list = list_get(key)
 
-    #Return if the list is cached and all values are not found
-    if USE_CACHE:
-        cached = cache_get(key, system)
-        if cached:
-            if all(val not in cached for val in values):
-                return 'ok'
+    if all(val not in current_list for val in values):
+        return 'ok'
 
-    storage_node = locate_node_or_init(key, system)
-    result = storage_node.list_remove(key, values)
-    cache_delete(key, system)
-    return result
+    for v in values:
+        current_list.remove(v)
+
+    return list_set(key, current_list, system)
 
 def list_set(key, values, system='default'):
     key = 'll_%s' % key
     storage_node = locate_node_or_init(key, system)
     result = storage_node.list_set(key, values)
-    cache_delete(key, system)
+    cache_set(key, values, system=system)
     return result
 
 def list_varnish(key, system='default'):
