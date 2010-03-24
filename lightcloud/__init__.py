@@ -108,8 +108,31 @@ def list_get(key, system='default', **kw):
 
 def list_add(key, values, system='default', limit=200):
     key = 'll_%s' % key
+
+    #Return if the list is cached and all values are already added
+    if USE_CACHE:
+        cached = cache_get(key, system)
+        if cached:
+            if all(val in cached for val in values):
+                return 'ok'
+
     storage_node = locate_node_or_init(key, system)
     result = storage_node.list_add(key, values, limit)
+    cache_delete(key, system)
+    return result
+
+def list_remove(key, values, system='default'):
+    key = 'll_%s' % key
+
+    #Return if the list is cached and all values are not found
+    if USE_CACHE:
+        cached = cache_get(key, system)
+        if cached:
+            if all(val not in cached for val in values):
+                return 'ok'
+
+    storage_node = locate_node_or_init(key, system)
+    result = storage_node.list_remove(key, values)
     cache_delete(key, system)
     return result
 
@@ -120,25 +143,11 @@ def list_set(key, values, system='default'):
     cache_delete(key, system)
     return result
 
-def list_remove(key, values, system='default'):
-    key = 'll_%s' % key
-    storage_node = locate_node_or_init(key, system)
-    result = storage_node.list_remove(key, values)
-    cache_delete(key, system)
-    return result
-
 def list_varnish(key, system='default'):
     key = 'll_%s' % key
     result = delete(key, system)
     cache_delete(key, system)
     return result
-
-def list_is_created(key, system='default'):
-    key = 'll_%s' % key
-    value = get(key, system)
-    if value:
-        return True
-    return False
 
 
 #--- Get, set and delete ----------------------------------------------
