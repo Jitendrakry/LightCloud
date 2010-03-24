@@ -84,13 +84,22 @@ class TyrantClient:
 
     def list_add(self, key, values, limit=200):
         key = encode_key(key)
-        self.call_db(key, 'putcat', key, self._encode_list(values))
-        return True
+        if limit != 200:
+            key = '%s|%s' % (limit, key)
+        return self.call_db(key, 'ext',
+                            'list_add', 0,
+                            key, self._encode_list(values))
 
     def list_set(self, key, values):
         key = encode_key(key)
         values = self._encode_list(values)
         return self.set(key, values)
+
+    def list_remove(self, key, values):
+        key = encode_key(key)
+        return self.call_db(key, 'ext',
+                            'list_remove', 0,
+                            key, self._encode_list(values))
 
     def list_get(self, key):
         key = encode_key(key)

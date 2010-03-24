@@ -107,47 +107,40 @@ def list_get(key, system='default', **kw):
     return val
 
 def list_add(key, values, system='default', limit=200):
-    current_list = list_get(key)
+    key = 'll_%s' % key
 
-    values = map(str, values)
-    only_new = [ v for v in values if v not in current_list ]
+    #Return if the list is cached and all values are already added
+    if USE_CACHE:
+        cached = cache_get(key, system)
+        if cached:
+            if all(val in cached for val in values):
+                return 'ok'
 
-    #Return if they all have been added
-    if len(only_new) == 0:
-        return 'ok'
-
-    list_key = 'll_%s' % key
-
-    #Check if a cleanup should be done
-    if len(current_list) < (limit+100):
-        current_list.extend(only_new)
-        storage_node = locate_node_or_init(list_key, system)
-        result = storage_node.list_add(list_key, only_new, limit)
-        cache_set(list_key, current_list, system=system)
-        return 'ok'
-    else:
-        current_list.extend(only_new)
-        current_list = current_list[-limit:]
-        return list_set(key, current_list)
+    storage_node = locate_node_or_init(key, system)
+    result = storage_node.list_add(key, values, limit)
+    cache_delete(key, system)
+    return result
 
 def list_remove(key, values, system='default'):
-    values = map(str, values)
+    key = 'll_%s' % key
 
-    current_list = list_get(key)
+    #Return if the list is cached and all values are not found
+    if USE_CACHE:
+        cached = cache_get(key, system)
+        if cached:
+            if all(val not in cached for val in values):
+                return 'ok'
 
-    if all(val not in current_list for val in values):
-        return 'ok'
-
-    for v in values:
-        current_list.remove(v)
-
-    return list_set(key, current_list, system)
+    storage_node = locate_node_or_init(key, system)
+    result = storage_node.list_remove(key, values)
+    cache_delete(key, system)
+    return result
 
 def list_set(key, values, system='default'):
     key = 'll_%s' % key
     storage_node = locate_node_or_init(key, system)
     result = storage_node.list_set(key, values)
-    cache_set(key, values, system=system)
+    cache_delete(key, system)
     return result
 
 def list_varnish(key, system='default'):
