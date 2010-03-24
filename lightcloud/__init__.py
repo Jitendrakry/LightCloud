@@ -94,6 +94,7 @@ def list_get(key, system='default', **kw):
 
     if USE_CACHE:
         val = cache_get(key, system)
+
         if val:
             return val
 
@@ -262,15 +263,15 @@ def _clean_up_ring(key, value, system):
 #--- Cache layer ----------------------------------------------
 def cache_set(key, value, system='default', time=0):
     key = '%s:%s' % (system, key)
-    GET_CACHE().set(key, value, time=time)
+    return GET_CACHE().set(key, value, time=time)
 
-def cache_get(key, value, system='default'):
+def cache_get(key, system='default'):
     key = '%s:%s' % (system, key)
-    GET_CACHE().get(key)
+    return GET_CACHE().get(key)
 
 def cache_delete(key, system='default'):
     key = '%s:%s' % (system, key)
-    GET_CACHE().delete(key)
+    return GET_CACHE().delete(key)
 
 def expire_cache():
     pass

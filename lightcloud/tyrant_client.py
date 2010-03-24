@@ -93,7 +93,7 @@ class TyrantClient:
     def list_set(self, key, values):
         key = encode_key(key)
         values = self._encode_list(values)
-        return self.set(key, self._encode_list(values))
+        return self.set(key, values)
 
     def list_remove(self, key, values):
         key = encode_key(key)
