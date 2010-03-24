@@ -107,21 +107,33 @@ def list_get(key, system='default', **kw):
     return val
 
 def list_add(key, values, system='default', limit=200):
-    key = 'll_%s' % key
+    current_list = list_get(key)
 
-    #Return if the list is cached and all values are already added
-    if USE_CACHE:
-        cached = cache_get(key, system)
-        if cached:
-            if all(val in cached for val in values):
-                return 'ok'
+    values = map(str, values)
+    only_new = [ v for v in values if v not in current_list ]
 
-    storage_node = locate_node_or_init(key, system)
-    result = storage_node.list_add(key, values, limit)
-    cache_delete(key, system)
-    return result
+    #Return if they all hav been added
+    if len(only_new) == 0:
+        return 'ok'
+
+    list_key = 'll_%s' % key
+
+    #Check if a cleanup should be done
+    if len(current_list) < (limit+100):
+        current_list.extend(only_new)
+        storage_node = locate_node_or_init(list_key, system)
+        result = storage_node.list_add(list_key, only_new, limit)
+    else:
+        current_list.extend(only_new)
+        current_list = current_list[-limit:]
+        list_set(key, current_list)
+
+    cache_set(list_key, current_list, system=system)
+    return 'ok'
 
 def list_remove(key, values, system='default'):
+    values = map(str, values)
+
     current_list = list_get(key)
 
     if all(val not in current_list for val in values):
